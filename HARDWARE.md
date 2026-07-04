@@ -35,7 +35,7 @@
 
 - 窗运动到 **全开** 或 **全关** 端点时，同一传感器都会被触发（输出低电平）
 - 因此端点检测**完全靠霍尔**，不依赖行程时间
-- 中途百分比停靠（Matter `GoToLiftPercentage`）使用 `travel_ms`（标称约 30 s）做位置估算和上报，校准后写入 NVS
+- 中途百分比停靠（Matter `GoToLiftPercentage`）使用 `travel_ms` 做位置估算和上报：固件默认 3 分钟（`TRAVEL_MS_DEF`），实际以校准后写入 NVS 的实测值为准（本机约 30 s）
 
 ### LEAVING 状态防误触
 
@@ -158,7 +158,7 @@ BAT pad ──[R1 100kΩ]──┬──► D2 (GPIO2, ADC1_CH2)
 
 ## 板上诊断日志（NVS 环形缓冲）
 
-日志写入 NVS namespace `"diag"`，128 条循环缓冲，每条 16 字节，总占 ~2KB。
+日志写入 NVS namespace `"diag"`，256 条循环缓冲，每条 16 字节，总占 ~4KB。
 
 **记录事件**（`enum diag_type_t`）：
 | 类型 | 触发 | aux1 含义 |
