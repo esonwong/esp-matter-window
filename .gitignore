@@ -1,0 +1,27 @@
+
+# ESP-IDF specific
+/build/
+/sdkconfig
+/sdkconfig.old
+sdkconfig.ci*
+/managed_components/
+dist/
+
+# IDE / Editor
+.vscode/
+.idea/
+.DS_Store
+*.swp
+/compile_commands.json
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Claude Code local settings
+.claude/settings.local.json
+
+# Misc
+.cache/
+/logs/

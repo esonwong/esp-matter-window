@@ -1,0 +1,26 @@
+# Matter 专用分区表（4MB Flash，无 OTA）
+#
+# 学习笔记：为什么需要自定义分区表？
+#
+#   默认分区表的 app 分区只有 1MB，Matter SDK 编译后约 1.5-2MB，放不下。
+#   Matter 还需要：
+#     - 更大的 NVS 空间：存储 Fabric 证书（每个 Fabric 约 4KB）
+#     - fctry 分区：存储设备认证证书（DAC）和工厂配置
+#     - 分区表偏移移到 0xC000（为扩展 Bootloader 留空间）
+#
+# Flash 布局（4MB = 0x400000）：
+#   0x000000 - 0x00BFFF : Bootloader（含 Secure Boot 扩展，48KB）
+#   0x00C000 - 0x00CFFF : 分区表（本文件，4KB，偏移由 sdkconfig 设置）
+#   0x010000 - 0x017FFF : NVS（32KB；Matter fabric/ACL/operational-keys、OpenThread NetworkInfo、
+#                              chip-counters、diag_log 环形缓冲。16KB 已被实测撑爆触发 OT assert）
+#   0x018000 - 0x018FFF : PHY 校准数据（4KB）
+#   0x019000 - 0x019FFF : NVS Keys（加密密钥，4KB）
+#   0x01A000 - 0x01FFFF : Factory 分区（Matter DAC 证书等，24KB）
+#   0x020000 - 0x3FFFFF : App（主程序，约 3.75MB，足够 Matter + 我们的代码）
+#
+# Name,     Type,   SubType,    Offset,   Size,   Flags
+nvs,        data,   nvs,        0x10000,  0x8000,
+phy_init,   data,   phy,        0x18000,  0x1000,
+nvs_keys,   data,   nvs_keys,   0x19000,  0x1000, encrypted
+fctry,      data,   nvs,        0x1A000,  0x6000,
+app,        app,    factory,    0x20000,  0x3E0000,
