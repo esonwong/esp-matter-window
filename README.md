@@ -150,7 +150,7 @@ step = 10000 / (travel_ms / 100)   # 动态计算，随校准结果自动调整
 
 > **量级预期**：全套环境（ESP-IDF ≈3.5 GB + esp-matter 浅克隆 ≈5.7 GB + 工具链 ≈2.5 GB + 构建产物 ≈1.2 GB）约需 **13 GB 磁盘**，下载耗时取决于网络，从零到能构建通常需要数小时，其中绝大部分是下载时间。
 >
-> 工具链默认安装到 `~/.espressif`；想隔离环境（例如多版本共存）可在两个 `install.sh` 之前 `export IDF_TOOLS_PATH=/path/to/tools`。
+> 工具链默认安装到 `~/.espressif`；想隔离环境（例如多版本共存）可在两个 `install.sh` 之前 `export IDF_TOOLS_PATH=/path/to/tools`。注意该变量不只安装时需要——以后每个新终端激活环境（`source ./env.sh`）前都得先导出它，否则 `export.sh` 找不到工具链，建议写进 shell rc。
 
 ### 1. 安装 ESP-IDF v5.5.2
 
@@ -224,8 +224,12 @@ source ./env.sh
 SDK 装在其他位置时先导出变量再 source：
 
 ```bash
-IDF_PATH=/path/to/esp-idf ESP_MATTER_PATH=/path/to/esp-matter source ./env.sh
+export IDF_PATH=/path/to/esp-idf
+export ESP_MATTER_PATH=/path/to/esp-matter
+source ./env.sh
 ```
+
+> 注意不要写成 `IDF_PATH=... ESP_MATTER_PATH=... source ./env.sh` 的一行前缀形式——在 zsh 下（macOS 默认 shell）对 `source` 内建命令的前缀赋值是临时绑定，脚本返回后变量会被还原，导致后续构建报 `ESP_MATTER_PATH 未设置`（bash 下无此问题）。
 
 esp-matter 的 `export.sh` 会自动设置 `ESP_MATTER_PATH` 并把 pigweed/gn 加入 PATH，无需手动改 PATH。
 
