@@ -148,6 +148,10 @@ step = 10000 / (travel_ms / 100)   # 动态计算，随校准结果自动调整
 
 以下以 `$HOME/esp` 作为 SDK 安装目录（惯例示例，可自选位置；路径不同则通过 `IDF_PATH` / `ESP_MATTER_PATH` 环境变量告知本项目的 `env.sh`）。
 
+> **量级预期**：全套环境（ESP-IDF ≈3.5 GB + esp-matter 浅克隆 ≈5.7 GB + 工具链 ≈2.5 GB + 构建产物 ≈1.2 GB）约需 **13 GB 磁盘**，下载耗时取决于网络，从零到能构建通常需要数小时，其中绝大部分是下载时间。
+>
+> 工具链默认安装到 `~/.espressif`；想隔离环境（例如多版本共存）可在两个 `install.sh` 之前 `export IDF_TOOLS_PATH=/path/to/tools`。
+
 ### 1. 安装 ESP-IDF v5.5.2
 
 ```bash
@@ -175,6 +179,35 @@ cd connectedhomeip/connectedhomeip
 cd ../..
 ./install.sh   # 不需要 chip-tool 可加 --no-host-tool
 ```
+
+### 下载失败与恢复
+
+克隆链路涉及 5 GB+ 下载、数十个子模块仓库，网络中断很常见。**最大的坑**：大子模块克隆被中断后，重跑 `git submodule update --init` 会显示"成功"却不恢复工作树（子模块 SHA 已匹配就跳过 checkout，文件却处于删除状态）——错误可能推迟到编译进行几十分钟后才以"Source file not found"之类的形式爆出。
+
+任何 clone / submodule 步骤失败后，**重试前先强制恢复工作树**：
+
+```bash
+# 在报错的仓库目录里（esp-idf 或 connectedhomeip/connectedhomeip）执行：
+git submodule update --init --recursive --force
+# 或者只修工作树：
+git submodule foreach --recursive 'git checkout -f'
+```
+
+`checkout_submodules.py` 失败则直接原样重跑一次（它自身可续传），完成后如仍报缺文件，同样用上面的 `--force` 修复。
+
+### 中国大陆网络加速
+
+以下均为 Espressif 官方支持的镜像，可把数小时的下载压缩到几十分钟：
+
+```bash
+# 工具链二进制走 Espressif 国内 CDN（对 install.sh 生效）
+export IDF_GITHUB_ASSETS="dl.espressif.com/github_assets"
+
+# pip 走国内镜像（对 install.sh 安装 python 包生效）
+export PIP_INDEX_URL="https://pypi.tuna.tsinghua.edu.cn/simple"
+```
+
+ESP-IDF 仓库本体可改用 Espressif 官方镜像克隆：`https://jihulab.com/esp-mirror/espressif/esp-idf.git`（其余步骤不变）。esp-matter 及 connectedhomeip 子模块目前无完整官方镜像，建议在网络稳定时段克隆，配合上一节的恢复方法重试。
 
 ### 3. 每次开发前激活环境
 
@@ -215,6 +248,8 @@ stdbuf -oL idf.py flash monitor 2>&1 | tee ./logs/$(date +%Y%m%d_%H%M%S).txt
 > **默认（省电）配置关闭了串口控制台**（`CONFIG_ESP_CONSOLE_NONE=y`），`idf.py monitor` 不会有任何输出。要看日志需临时把 sdkconfig 改为 `CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y` 重新构建烧录，调试完再改回。
 >
 > **修改 `sdkconfig.defaults` 后**需让 sdkconfig 重新生成：`rm sdkconfig && idf.py build`（或 `idf.py fullclean`）。
+>
+> **configure 阶段失败后**，残留的 `build/` 目录可能让 `idf.py set-target` 拒绝执行自动 fullclean 并报错，此时 `rm -rf build` 再重试即可。
 >
 > 若设备陷入崩溃重启循环，按住 **BOOT** 再按 **RESET** 进入下载模式后重新烧录。
 

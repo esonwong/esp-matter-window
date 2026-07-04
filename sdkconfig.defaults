@@ -38,7 +38,6 @@ CONFIG_IEEE802154_ENABLED=y
 
 # ── 禁用 Wi-Fi（改用 Thread） ────────────────────────────────────────────
 CONFIG_ENABLE_WIFI_STATION=n
-CONFIG_ENABLE_WIFI_AP=n
 
 # ── IPv6 / LwIP（Thread 管理 IPv6，禁用 LwIP 自动配置避免冲突） ──────────
 # 官方例子注释：Disable lwip ipv6 autoconfig - 由 OpenThread 管理
