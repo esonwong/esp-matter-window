@@ -18,7 +18,7 @@
 | **电池电压 ADC** | **GPIO2** | **D2** | ADC1_CH2，100K+100K 分压到 BAT pad |
 | 霍尔传感器 | GPIO23 | D5 | 低电平有效，内部上拉 |
 | 板载 LED | GPIO15 | — | 开漏，状态指示 |
-| BOOT 按键 | GPIO9 | — | 低电平有效，单/双/三击 |
+| BOOT 按键 | GPIO9 | — | 低电平有效，单/双/三击，长按 5 s 工厂重置 |
 
 ## 电机驱动
 
@@ -64,6 +64,7 @@
 | 单击 | 运动中暂停；静止时开 ↔ 关切换；校准中：停止并记录行程 |
 | 双击 | 运动中反向；静止时与单击相反方向 |
 | 三击 | 触发校准（先到全开端，再计时跑到全关，写入 NVS） |
+| 长按 5 s | 工厂重置：先停电机、LED 快闪，再经 CHIP 任务调用 `esp_matter::factory_reset()`（清 Matter 配对与 NVS 并重启） |
 
 按键由 `iot_button` 组件驱动，所有回调内部都先调用 `icd_wake()` 唤醒 ICD，再操作状态机。
 
@@ -163,11 +164,11 @@ BAT pad ──[R1 100kΩ]──┬──► D2 (GPIO2, ADC1_CH2)
 **记录事件**（`enum diag_type_t`）：
 | 类型 | 触发 | aux1 含义 |
 |---|---|---|
-| `DIAG_BOOT` (1) | 每次开机 | `esp_reset_reason()` |
+| `DIAG_BOOT` (1) | 每次开机 | `esp_reset_reason()`；连续同原因 BOOT 原地合并（`motor_n` 字段=重复次数），防止欠压复位循环冲光整个环 |
 | `DIAG_HOURLY` (2) | 每小时 | 0 |
 | `DIAG_MOTOR_CMD` (3) | （预留）| 方向 |
 | `DIAG_MOTOR_DONE` (4) | （预留）| 最终 state |
-| `DIAG_BUTTON` (5) | 按键 | 1=单击, 2=双击, 3=三击 |
+| `DIAG_BUTTON` (5) | 按键 | 1=单击, 2=双击, 3=三击, 5=长按工厂重置 |
 | `DIAG_STATE` (6) | window_state 变化 | 新 state |
 
 **每条事件字段**：uptime_s, type, aux1, vbat_mv, position, state, motor_count, button_count, free_heap_kb
@@ -208,6 +209,10 @@ CONFIG_SUPPORT_ICD_MANAGEMENT_CLUSTER=y
 ```
 
 ## 已知与硬件相关的注意点
+
+- **低压锁定电机**（`window_ctrl.cpp` `MOTOR_VBAT_MIN_MV=3300`）：vbat < 3.3 V 时开/关/百分比/校准命令直接拒绝并打 WARN 日志。
+  背景：2026-08-16 dump 显示旧电池放空后设备在 2.4–2.6 V 处 brownout（reset reason 9）循环了 233 次、WDT 19 次，
+  这种状态下再启动几百 mA 的电机只会把窗户卡在半路。ADC 未就绪（读数 ≤ 0）时不拦截。
 
 - `motor_ctrl.h` 顶部注释写的 `D0=GPIO2, D1=GPIO3, 20kHz PWM`，与实际实现（GPIO0/GPIO1，纯电平）不一致 —— 以 `motor_ctrl.cpp` 为准
 - 霍尔传感器低电平有效，上电时若磁铁恰好覆盖传感器，状态机会判为已在端点状态

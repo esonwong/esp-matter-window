@@ -1,0 +1,5 @@
+# 调试叠加层：仅在 sdkconfig.defaults 之上打开 USB-JTAG console，用于 dump diag log
+# 用法：idf.py -B build-debug -DSDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.debug" -DSDKCONFIG=build-debug/sdkconfig build
+CONFIG_ESP_CONSOLE_NONE=n
+CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
+CONFIG_ESP_CONSOLE_SECONDARY_NONE=y

@@ -25,3 +25,4 @@ __pycache__/
 # Misc
 .cache/
 /logs/
+/build-debug/

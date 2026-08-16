@@ -9,11 +9,11 @@
 // dump 方式：烧调试固件（USJ console 开启）→ boot 时自动 printf 全部条目
 
 enum diag_type_t : uint8_t {
-    DIAG_BOOT = 1,        // 系统启动；aux1=reset_reason
+    DIAG_BOOT = 1,        // 系统启动；aux1=reset_reason；连续同原因 BOOT 合并为一条，motor_count=重复次数
     DIAG_HOURLY = 2,      // 每小时快照
     DIAG_MOTOR_CMD = 3,   // 电机指令；aux1=方向 (1=open,2=close,3=stop,4=move,5=cal)
     DIAG_MOTOR_DONE = 4,  // 电机停止；aux1=最终 state
-    DIAG_BUTTON = 5,      // 按键；aux1=点击次数 (1/2/3)
+    DIAG_BUTTON = 5,      // 按键；aux1=点击次数 (1/2/3)，5=长按工厂重置
     DIAG_STATE = 6,       // window_state 变化；aux1=新 state
 };
 

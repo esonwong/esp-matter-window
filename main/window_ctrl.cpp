@@ -12,6 +12,7 @@
 #include "button_gpio.h"
 #include <atomic>
 #include <platform/CHIPDeviceLayer.h>
+#include <esp_matter_core.h>
 #if CHIP_CONFIG_ENABLE_ICD_SERVER
 #include <app/icd/server/ICDNotifier.h>
 #endif
@@ -22,6 +23,14 @@ static const char *TAG = "WINDOW";
 #define LED_GPIO GPIO_NUM_15  // XIAO 板载 LED
 #define BTN_GPIO GPIO_NUM_9   // XIAO BOOT 按键（低电平有效）
 #define HALL_GPIO GPIO_NUM_23 // D5 霍尔传感器（低电平有效，内部上拉；两端各一块磁铁）
+
+// ── 按键 ──────────────────────────────────────────────────────────────────
+#define FACTORY_RESET_PRESS_MS 5000 // 长按 5 秒：工厂重置（清除 Matter 配对 + NVS）
+
+// ── 低压锁定 ──────────────────────────────────────────────────────────────
+// 电池低于此电压时拒绝启动电机：电机几百 mA 会把电压拉穿触发 brownout，
+// 窗户卡在半路 + 设备复位循环（2026-08-16 dump 里就是这种状态）。
+#define MOTOR_VBAT_MIN_MV 3300
 
 // ── 行程参数 ──────────────────────────────────────────────────────────────
 #define TICK_MS 100
@@ -93,6 +102,18 @@ static void save_travel_ms(uint32_t ms)
 static uint16_t pos_step(void)
 {
     return (uint16_t)(10000 / (s_travel_ms / TICK_MS));
+}
+
+// 电机启动前的电池电压检查；ADC 未初始化/读取失败（<=0）时不拦截
+static bool vbat_ok_for_motor(void)
+{
+    int16_t mv = diag_get_vbat_mv();
+    if (mv > 0 && mv < MOTOR_VBAT_MIN_MV)
+    {
+        ESP_LOGW(TAG, "电池电压 %d mV < %d mV，拒绝启动电机", mv, MOTOR_VBAT_MIN_MV);
+        return false;
+    }
+    return true;
 }
 
 // ── 带方向的电机指令 ──────────────────────────────────────────────────────
@@ -283,6 +304,26 @@ static void btn_cb_three(void *, void *)
     window_ctrl_calibrate();
 }
 
+// 长按 5 秒：工厂重置。esp_matter::factory_reset() 内部通过 CHIP 栈调度并重启，
+// 为避免 chip stack lock 报错（README 踩坑 #5），仍统一投递到 CHIP 任务执行。
+static void factory_reset_work(intptr_t)
+{
+    ESP_LOGW(TAG, "执行工厂重置：清除 Matter 配对与 NVS，随后重启");
+    esp_matter::factory_reset();
+}
+static void btn_cb_long_press(void *, void *)
+{
+    diag_inc_button();
+    diag_log_event(DIAG_BUTTON, 5);
+    // 停下电机，避免重启瞬间窗户失控
+    if (s_cal_task_handle)
+        s_cal_stop.store(true);
+    else
+        window_ctrl_stop();
+    led_ctrl_set_mode(LED_BLINK_FAST); // 快闪提示：即将重置
+    chip::DeviceLayer::PlatformMgr().ScheduleWork(factory_reset_work);
+}
+
 // ── 控制任务：纯监控，不发电机指令 ──────────────────────────────────────
 static void window_task(void *arg)
 {
@@ -417,6 +458,7 @@ void window_ctrl_init(window_state_cb_t cb)
     led_ctrl_init(LED_GPIO);
 
     button_config_t btn_cfg = {};
+    btn_cfg.long_press_time = FACTORY_RESET_PRESS_MS;
     button_gpio_config_t gpio_cfg = {
         .gpio_num = BTN_GPIO,
         .active_level = 0,
@@ -431,6 +473,8 @@ void window_ctrl_init(window_state_cb_t cb)
     iot_button_register_cb(btn, BUTTON_SINGLE_CLICK, nullptr, btn_cb_single, nullptr);
     iot_button_register_cb(btn, BUTTON_MULTIPLE_CLICK, &args2, btn_cb_double, nullptr);
     iot_button_register_cb(btn, BUTTON_MULTIPLE_CLICK, &args3, btn_cb_three, nullptr);
+    button_event_args_t args_lp = {.long_press = {.press_time = FACTORY_RESET_PRESS_MS}};
+    iot_button_register_cb(btn, BUTTON_LONG_PRESS_START, &args_lp, btn_cb_long_press, nullptr);
 
     gpio_config_t hall_cfg = {};
     hall_cfg.pin_bit_mask = (1ULL << HALL_GPIO);
@@ -450,6 +494,8 @@ void window_ctrl_open(void)
     window_state_t cur = s_state.load();
     if (cur == WINDOW_OPEN)
         return;
+    if (!vbat_ok_for_motor())
+        return;
     ESP_LOGI(TAG, "开窗");
     s_target.store(0);
     set_state(cur == WINDOW_CLOSED ? WINDOW_LEAVING_CLOSED : WINDOW_OPENING);
@@ -460,6 +506,8 @@ void window_ctrl_close(void)
     window_state_t cur = s_state.load();
     if (cur == WINDOW_CLOSED)
         return;
+    if (!vbat_ok_for_motor())
+        return;
     ESP_LOGI(TAG, "关窗");
     s_target.store(10000);
     set_state(cur == WINDOW_OPEN ? WINDOW_LEAVING_OPEN : WINDOW_CLOSING);
@@ -469,6 +517,8 @@ void window_ctrl_move_to(uint16_t pos)
 {
     uint16_t current = s_pos.load();
     if (pos == current)
+        return;
+    if (!vbat_ok_for_motor())
         return;
     ESP_LOGI(TAG, "移动至 %d（当前 %d）", pos, current);
     s_target.store(pos);
@@ -483,6 +533,8 @@ void window_ctrl_calibrate(void)
 {
     if (s_cal_task_handle)
         return; // 已在校准中
+    if (!vbat_ok_for_motor())
+        return;
     ESP_LOGI(TAG, "开始校准");
     xTaskCreate(calibrate_task, "cal", 4096, nullptr, 5, &s_cal_task_handle);
 }

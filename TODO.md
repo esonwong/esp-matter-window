@@ -3,7 +3,7 @@
 ## 功耗 / 续航测试
 
 所有功耗 / 续航测试见 [`docs/power-tests.md`](docs/power-tests.md)。
-第 1 轮已完成（idle 16.5 mA），第 2 轮太阳能测试进行中。
+第 1 轮已完成（idle 16.5 mA，但旧电池容量存疑），第 2 轮太阳能测试已完成，**第 3 轮新电池基线进行中（2026-08-16 起）**。
 
 ## 待办
 
@@ -29,7 +29,7 @@
 - `sdkconfig` 与 `sdkconfig.defaults` 存在历史遗留的小不一致，可做一次 `rm sdkconfig && idf.py build` 从 defaults 重新生成
 - `main_app.cpp` / `matter_app.cpp` 里的 reset reason 调试打印可保留也可删；定型后大概率 reset 都是 POWERON，观察价值不大
 - DRV8833 nSLEEP 控制（静止时拉低关断驱动芯片，省 ~1.6 mA）
-- 工厂重置（长按按键 5 秒）
+- ~~工厂重置（长按按键 5 秒）~~ 已实现（2026-08-16，待实机验证）
 
 ## 重要踩坑备忘
 
