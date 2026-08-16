@@ -170,6 +170,7 @@ BAT pad ──[R1 100kΩ]──┬──► D2 (GPIO2, ADC1_CH2)
 | `DIAG_MOTOR_DONE` (4) | （预留）| 最终 state |
 | `DIAG_BUTTON` (5) | 按键 | 1=单击, 2=双击, 3=三击, 5=长按工厂重置 |
 | `DIAG_STATE` (6) | window_state 变化 | 新 state |
+| `DIAG_LOWBAT` (7) | 低电量进 deep sleep 前 | 1 |
 
 **每条事件字段**：uptime_s, type, aux1, vbat_mv, position, state, motor_count, button_count, free_heap_kb
 
@@ -210,6 +211,12 @@ CONFIG_SUPPORT_ICD_MANAGEMENT_CLUSTER=y
 
 ## 已知与硬件相关的注意点
 
+- **低电量 deep sleep**（`lowbat.cpp`）：每 60 s 采样，连续 3 次 vbat < 3100 mV 且窗户静止 → 记 `DIAG_LOWBAT`、
+  电机 coast、LED 灭、deep sleep 600 s；定时唤醒后在 `app_main` 最前面读电压，< 3400 mV 直接再睡
+  （不写 NVS、不起 Matter/Thread），≥ 3400 mV 才正常启动（BOOT reason=8 DEEPSLEEP）。
+  按键 GPIO9 不在 LP 域，deep sleep 期间按键无效，只能等 USB / 太阳能把电压充回来。
+  deep sleep 期间仍有 DRV8833 静态 ~1.6 mA（nSLEEP 硬连 VCC），比 idle 16 mA 好一个量级，但不是零。
+  阈值可用 `EXTRA_CXXFLAGS=-DLOWBAT_SLEEP_MV=...` 在编译时覆盖（测试用）。
 - **低压锁定电机**（`window_ctrl.cpp` `MOTOR_VBAT_MIN_MV=3300`）：vbat < 3.3 V 时开/关/百分比/校准命令直接拒绝并打 WARN 日志。
   背景：2026-08-16 dump 显示旧电池放空后设备在 2.4–2.6 V 处 brownout（reset reason 9）循环了 233 次、WDT 19 次，
   这种状态下再启动几百 mA 的电机只会把窗户卡在半路。ADC 未就绪（读数 ≤ 0）时不拦截。

@@ -15,6 +15,7 @@ enum diag_type_t : uint8_t {
     DIAG_MOTOR_DONE = 4,  // 电机停止；aux1=最终 state
     DIAG_BUTTON = 5,      // 按键；aux1=点击次数 (1/2/3)，5=长按工厂重置
     DIAG_STATE = 6,       // window_state 变化；aux1=新 state
+    DIAG_LOWBAT = 7,      // 低电量保护：aux1=1 进入 deep sleep（唤醒后恢复表现为 BOOT reason=8 DEEPSLEEP）
 };
 
 struct __attribute__((packed)) diag_event_t {
@@ -46,6 +47,9 @@ void diag_inc_button(void);
 
 // 设置位置上下文（每次 set_state 调用）
 void diag_set_context(uint8_t state, uint16_t pos_100ths);
+
+// 只初始化 ADC（幂等）。供 lowbat_early_check 在 diag_log_init 之前读电压
+void diag_adc_init(void);
 
 // 读取电池电压（mV）。返回 0 = ADC 未初始化；返回 < 0 = 读取失败
 // 内部已平均 8 次采样

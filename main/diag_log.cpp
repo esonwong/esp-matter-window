@@ -42,6 +42,7 @@ static std::atomic<uint8_t>  s_ctx_position{0};
 // ── ADC 初始化与读取 ─────────────────────────────────────────────────────
 static void adc_init(void)
 {
+    if (s_adc_ok) return;
     adc_oneshot_unit_init_cfg_t init = { .unit_id = VBAT_ADC_UNIT };
     if (adc_oneshot_new_unit(&init, &s_adc) != ESP_OK) {
         ESP_LOGW(TAG, "ADC unit 初始化失败");
@@ -82,6 +83,7 @@ static int16_t read_vbat_mv(void)
 }
 
 int16_t diag_get_vbat_mv(void) { return read_vbat_mv(); }
+void diag_adc_init(void) { adc_init(); }
 
 // ── NVS 读写 ──────────────────────────────────────────────────────────────
 static void load_ring(void)

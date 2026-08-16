@@ -26,3 +26,4 @@ __pycache__/
 .cache/
 /logs/
 /build-debug/
+/build-lbtest/

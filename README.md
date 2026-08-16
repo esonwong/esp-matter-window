@@ -44,8 +44,11 @@
 
 ```
 app_main
-├── window_ctrl_init()   # 电机 + LED + 按键，FreeRTOS 任务，100 ms tick
-└── matter_app_init()    # Matter 协议栈，WindowCovering 设备类型
+├── lowbat_early_check()   # deep sleep 唤醒且 vbat 仍 <3.4 V → 直接再睡（不起协议栈）
+├── diag_log_init()        # NVS 环形诊断日志 + 电池 ADC
+├── window_ctrl_init()     # 电机 + LED + 按键，FreeRTOS 任务，100 ms tick
+├── matter_app_init()      # Matter 协议栈，WindowCovering + PowerSource
+└── lowbat_monitor_start() # 连续 <3.1 V → deep sleep 10 min，防止把电池放死
 ```
 
 **端点检测**：全开和全关均靠霍尔传感器触发，不依赖行程时间。两端各放一块磁铁，窗到达端点时同一传感器触发（低电平有效）。
@@ -440,6 +443,7 @@ chip::DeviceLayer::PlatformMgr().ScheduleWork(icd_wake_work);
 - [ ] DRV8833 nSLEEP 控制（静止时拉低关断驱动芯片，节省 ~1–2 mA）
 - [x] 工厂重置（长按按键 5 秒）
 - [x] 低压锁定电机（vbat < 3.3 V 拒绝启动，防 brownout 复位循环）
+- [x] 低电量 deep sleep（连续 <3.1 V 休眠，每 10 min 醒来查电压，≥3.4 V 恢复）
 - [x] diag 连续同原因 BOOT 合并（防欠压循环冲光环形缓冲）
 
 ## 许可

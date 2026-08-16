@@ -1,6 +1,7 @@
 #include "matter_app.h"
 #include "window_ctrl.h"
 #include "diag_log.h"
+#include "lowbat.h"
 #include "esp_log.h"
 #include "esp_system.h"
 #include "freertos/FreeRTOS.h"
@@ -46,6 +47,9 @@ extern "C" void app_main(void)
 {
     g_reset_reason_at_boot = esp_reset_reason();
 
+    // 低电量 deep sleep 定时唤醒：电压仍低就直接再睡（不起 NVS/Matter，省电）
+    lowbat_early_check();
+
     // NVS（Matter 和 Wi-Fi 凭据必须）
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
@@ -62,6 +66,9 @@ extern "C" void app_main(void)
 
     // Matter 协议栈（WindowCovering 设备）
     matter_app_init();
+
+    // 低电量保护：连续低压时进 deep sleep，防止把电池放死
+    lowbat_monitor_start();
 
     ESP_LOGI(TAG, "初始化完成");
 }
