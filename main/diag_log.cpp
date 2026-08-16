@@ -132,8 +132,19 @@ void diag_log_event(diag_type_t type, uint8_t aux1)
     ev.free_heap_kb = (uint16_t)(esp_get_free_heap_size() / 1024);
 
     xSemaphoreTake(s_mutex, portMAX_DELAY);
-    s_ring[s_head] = ev;
-    s_head = (s_head + 1) % DIAG_RING_LEN;
+    // 连续的同原因 BOOT（上一条就是 BOOT，说明上次开机没活到记下任何别的事件，
+    // 典型是欠压/看门狗复位循环）原地合并，避免把 256 条环形缓冲全冲成 BOOT。
+    // 合并后：motor_count 字段 = 累计重复次数，vbat 取最新值。
+    diag_event_t &prev = s_ring[(s_head + DIAG_RING_LEN - 1) % DIAG_RING_LEN];
+    if (type == DIAG_BOOT && prev.type == DIAG_BOOT && prev.aux1 == aux1) {
+        prev.vbat_mv = ev.vbat_mv;
+        prev.free_heap_kb = ev.free_heap_kb;
+        if (prev.motor_count < 0xFFFF) prev.motor_count++;
+    } else {
+        if (type == DIAG_BOOT) ev.motor_count = 1;
+        s_ring[s_head] = ev;
+        s_head = (s_head + 1) % DIAG_RING_LEN;
+    }
     save_ring();
     xSemaphoreGive(s_mutex);
 }
