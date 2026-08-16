@@ -35,7 +35,9 @@ static_assert(sizeof(diag_event_t) == 16, "diag_event_t must be 16 bytes");
 void diag_log_init(void);
 
 // 记录一条事件（aux1 见 diag_type_t 注释）
-void diag_log_event(diag_type_t type, uint8_t aux1 = 0);
+// persist=false：只写内存环，不立刻落 NVS（运动中的中间状态用，减少 4 KB blob 重写次数）；
+// 下一次 persist=true 的事件或每小时快照会一并落盘
+void diag_log_event(diag_type_t type, uint8_t aux1 = 0, bool persist = true);
 
 // dump：按时间顺序 printf 所有条目（一行一条 CSV）
 // 仅在 USJ console 开启的调试固件里有效

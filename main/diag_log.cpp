@@ -119,7 +119,7 @@ void diag_set_context(uint8_t state, uint16_t pos_100ths)
     s_ctx_position.store((uint8_t)(pos_100ths / 100));
 }
 
-void diag_log_event(diag_type_t type, uint8_t aux1)
+void diag_log_event(diag_type_t type, uint8_t aux1, bool persist)
 {
     if (!s_mutex) return;
     diag_event_t ev = {};
@@ -147,7 +147,7 @@ void diag_log_event(diag_type_t type, uint8_t aux1)
         s_ring[s_head] = ev;
         s_head = (s_head + 1) % DIAG_RING_LEN;
     }
-    save_ring();
+    if (persist) save_ring();
     xSemaphoreGive(s_mutex);
 }
 

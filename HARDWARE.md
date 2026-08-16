@@ -253,7 +253,7 @@ HOURLY 快照 vbat：4080 → 4064 → 4058 → 4054 → 4050 mV（4 小时降 3
 
 1. **软件侧**：查 Thread polling 间隔（当前 `ICD_SLOW_POLL_INTERVAL_MS=5000`，
    5 秒一次轮询本身就 mA 级）、Matter subscription 流量、LightSleep 是否真的进了
-2. **DRV8833 nSLEEP 接 GPIO**：运动结束就拉低，1.6 mA → 2 µA。绝对值省 1.6 mA
+2. **DRV8833 nSLEEP 接 GPIO**（软件已预留：`motor_ctrl.cpp` 把 `MOTOR_NSLEEP_GPIO` 从 `GPIO_NUM_NC` 改成飞线的引脚即可，建议 D6/GPIO16 或 D7/GPIO17）：运动结束就拉低，1.6 mA → 2 µA。绝对值省 1.6 mA
    把续航从 5.7 天延长到 ~6.3 天（+11%）
 3. **VM 加 P-MOSFET 全切电机驱动板供电**：比 nSLEEP 多省零点几 mA，但成本高、
    PCB 改动大，不划算

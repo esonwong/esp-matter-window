@@ -125,7 +125,10 @@ static void set_state(window_state_t st)
 {
     s_state.store(st);
     diag_set_context((uint8_t)st, s_pos.load());
-    diag_log_event(DIAG_STATE, (uint8_t)st);
+    // 运动中的中间状态不立刻落 NVS，到达静止状态时一并写入
+    bool moving = (st == WINDOW_OPENING || st == WINDOW_CLOSING ||
+                   st == WINDOW_LEAVING_OPEN || st == WINDOW_LEAVING_CLOSED);
+    diag_log_event(DIAG_STATE, (uint8_t)st, !moving);
     switch (st)
     {
     case WINDOW_OPENING:

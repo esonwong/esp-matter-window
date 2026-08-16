@@ -440,7 +440,7 @@ chip::DeviceLayer::PlatformMgr().ScheduleWork(icd_wake_work);
 - [x] 通信层从 Wi-Fi 迁移到 Thread（IEEE 802.15.4）
 - [x] Matter over Thread 配网（Apple 家庭）
 - [x] ICD 配置（电池设备省电）
-- [ ] DRV8833 nSLEEP 控制（静止时拉低关断驱动芯片，节省 ~1–2 mA）
+- [ ] DRV8833 nSLEEP 控制（静止时拉低关断驱动芯片，节省 ~1–2 mA）—— 软件已预留，待硬件飞线
 - [x] 工厂重置（长按按键 5 秒）
 - [x] 低压锁定电机（vbat < 3.3 V 拒绝启动，防 brownout 复位循环）
 - [x] 低电量 deep sleep（连续 <3.1 V 休眠，每 10 min 醒来查电压，≥3.4 V 恢复）
