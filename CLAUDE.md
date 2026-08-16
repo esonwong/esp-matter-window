@@ -21,3 +21,18 @@ idf.py flash monitor
 - **端点检测**：全开和全关均靠霍尔传感器触发，不依赖行程时间（`travel_ms`）。
 - **`travel_ms`** 仅用于中途百分比停靠（GoToLiftPercentage）的位置估算，以及 Matter 百分比上报，不用于端点判断。
 - **LEAVING 状态**：从全开或全关出发时，先进入 `LEAVING_OPEN`/`LEAVING_CLOSED` 状态，等待磁铁离开传感器（`hall=false`）后，才切换到 `OPENING`/`CLOSING` 正常运动状态，防止霍尔传感器误触发。
+
+## 调试固件（打开 console 抓 diag dump）
+
+不要手改 `sdkconfig`，用叠加层单独构建到 `build-debug/`（与生产 `build/` 互不干扰）：
+
+```bash
+idf.py -B build-debug -DIDF_TARGET=esp32c6 \
+  -DSDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.debug" \
+  -DSDKCONFIG=build-debug/sdkconfig build
+idf.py -B build-debug -p <port> flash    # 不要 erase，保留配对与 diag 数据
+```
+
+boot 后约 15 s 自动 printf `=== DIAG LOG DUMP ===` CSV。USB-JTAG 复位会重枚举串口，
+串口读取脚本要能重连；`idf.py monitor` 需要 TTY，非交互环境用 pyserial 直接读。
+测完基线前记得烧回生产固件（console 开着 ICD LIT 平均功耗高几 mA）。
