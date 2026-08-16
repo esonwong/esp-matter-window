@@ -17,19 +17,20 @@
 
 ### 2. Dump diag log 流程
 
-生产固件 console 关闭，无法直接 dump。步骤：
+生产固件 console 关闭，无法直接 dump。用 `sdkconfig.debug` 叠加层单独构建调试固件
+（命令见 CLAUDE.md「调试固件」），`-B build-debug` **不擦除**烧录，boot 15 s 后自动 printf CSV。
+拿到数据后 `idf.py flash`（生产 `build/`）烧回，否则 ICD LIT 平均功耗会高几 mA。
 
-1. 临时打开 console：把 `sdkconfig` 里 `CONFIG_ESP_CONSOLE_NONE=y` 改成 `CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y`
-2. `idf.py build flash`（**不要 erase**，否则 NVS 配对与历史 diag 数据丢失）
-3. boot 时 diag_log 自动 printf 全部条目（CSV 格式）
-4. 拿到数据后改回 console 关闭并重新 flash，否则 ICD LIT 平均功耗会高几 mA
+**2026-08-16 教训**：旧电池放空后 brownout 复位循环把整个环冲成了 BOOT，历史 HOURLY 全丢
+（已修：连续同原因 BOOT 合并）。以后电池快空时先 dump 再说。
 
 ### 3. 低优先级
 
-- `sdkconfig` 与 `sdkconfig.defaults` 存在历史遗留的小不一致，可做一次 `rm sdkconfig && idf.py build` 从 defaults 重新生成
+- ~~`sdkconfig` 与 `sdkconfig.defaults` 不一致~~ 2026-08-16 已从 defaults 重新生成
 - `main_app.cpp` / `matter_app.cpp` 里的 reset reason 调试打印可保留也可删；定型后大概率 reset 都是 POWERON，观察价值不大
 - DRV8833 nSLEEP 控制（静止时拉低关断驱动芯片，省 ~1.6 mA）
-- ~~工厂重置（长按按键 5 秒）~~ 已实现（2026-08-16，待实机验证）
+- ~~工厂重置（长按按键 5 秒）~~ 已实现并编译通过（2026-08-16，长按动作待实机验证）
+- ~~低压锁定电机~~ 已实现（vbat < 3.3 V 拒绝启动）
 
 ## 重要踩坑备忘
 
