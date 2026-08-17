@@ -48,26 +48,37 @@ if last and last[0] != b0:
     m = (last[0] - b0).total_seconds() / 60
     if m > 1: print(f"  {b0:%m-%d %H:%M} → {last[0]:%H:%M}  {bv0}→{last[1]} mV  {(last[1] - bv0) / m:+.2f} mV/min（未满一段）")
 
-# 充入电量估算：按相邻点电压所处阶段积分
+# 终止判断：找电压峰值；峰值后回落 ≥ 20 mV 且之后斜率 ≈ 0 → 充电 IC 已终止，终止时刻 = 峰值时刻
+peak_i = max(range(len(pts)), key=lambda i: pts[i][1])
+t_peak, v_peak = pts[peak_i]
+after = pts[peak_i:]
+terminated = False
+if len(after) > 10 and (t1 - t_peak).total_seconds() > 1800:
+    slope_after = (v1 - after[len(after)//2][1]) / max((t1 - after[len(after)//2][0]).total_seconds() / 60, 1)
+    if v_peak - v1 >= 20 and abs(slope_after) < 0.1:
+        terminated = True
+t_end = t_peak if terminated else t1
+
+# 充入电量估算：只积分到终止时刻，按相邻点电压所处阶段积分
 mah = 0.0
 for (ta, va), (tb, vb) in zip(pts, pts[1:]):
+    if tb > t_end: break
     dh = (tb - ta).total_seconds() / 3600
     if dh > 0.5: continue  # 断档（烧录/休眠）不计
     v = (va + vb) / 2
     i = 12 if v < 3000 else (a.cc if v < 4150 else 60)
     mah += i * dh
-print(f"\n估算充入 ≈ {mah:.0f} mAh（CC 按 {a.cc:.0f} mA）")
+print(f"\n估算充入 ≈ {mah:.0f} mAh（CC 按 {a.cc:.0f} mA，积分到 {t_end:%m-%d %H:%M}）")
 
-# 终止判断：最后 60 min 斜率 ≈ 0 且 vbat ≥ 4.15 V
 tail = [(t, v) for t, v in pts if (t1 - t).total_seconds() <= 3600]
-if len(tail) >= 2:
-    slope = (tail[-1][1] - tail[0][1]) / max((tail[-1][0] - tail[0][0]).total_seconds() / 60, 1)
-    if v1 >= 4150 and abs(slope) < 0.2:
-        print(f"状态：已到 CV 平台/终止（最后 1h {slope:+.2f} mV/min）")
-    elif v1 >= 4150:
-        print(f"状态：CV 阶段（最后 1h {slope:+.2f} mV/min），接近充满")
-    else:
-        print(f"状态：仍在充（最后 1h {slope:+.2f} mV/min）")
+slope = (tail[-1][1] - tail[0][1]) / max((tail[-1][0] - tail[0][0]).total_seconds() / 60, 1) if len(tail) >= 2 else 0
+if terminated:
+    print(f"状态：已终止（峰值 {v_peak} mV @ {t_peak:%m-%d %H:%M}，之后静置 {(t1 - t_peak).total_seconds()/3600:.1f} h 到 {v1} mV，"
+          f"充电总时长 {(t_peak - t0).total_seconds()/3600:.1f} h）")
+elif v1 >= 4150:
+    print(f"状态：CV 阶段（最后 1h {slope:+.2f} mV/min），接近充满")
+else:
+    print(f"状态：仍在充（最后 1h {slope:+.2f} mV/min）")
 
 if events:
     print(f"\n事件 {len(events)} 条：")
