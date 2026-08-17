@@ -18,12 +18,16 @@
 电池 (−) ──┬────────────────────────► XIAO BAT− 焊盘
            └──────────────► FireBeetle GND
 
-FireBeetle 3V3    ──► INA226 VCC
-FireBeetle 19/SDA ──► INA226 SDA
-FireBeetle 20/SCL ──► INA226 SCL
-FireBeetle GND    ──► INA226 GND
-INA226 VBUS       ──► IN- 那一侧（= XIAO BAT+），读主控实际拿到的电压
+FireBeetle 3V3  ──► INA226 VCC
+FireBeetle SDA  ──► INA226 SDA     （正面 "SDA SCL GND 3V3" 那排焊盘，= GPIO19）
+FireBeetle SCL  ──► INA226 SCL     （= GPIO20）
+FireBeetle GND  ──► INA226 GND
+INA226 VBS      ──► INA226 IN-     （板上这两点不通，必须自己飞一根短线！）
 ```
+
+`VBS` = 总线电压检测脚。**不焊它电流照样准，只有电压读数是垃圾**——但接上就能和主控
+ADC 交叉标定（用来验证那个"ADC 偏低 80 mV"的疑点），所以顺手焊上。
+`ALE`（告警）不用接。
 
 FireBeetle 自己用板载 LiPo 或 USB 供电都行；USB 插电脑才能收 CSV。
 
@@ -48,8 +52,10 @@ ch2  电池 (+)     ──► [2IN+ ] [ 2IN- ] ──► CN3791 BAT / XIAO BAT+
 ch3  CN3791 OUT   ──► [3IN+ ] [ 3IN- ] ──► 主控负载
 
 所有 (−) / GND 共地，FireBeetle GND 一并接过来
-FireBeetle 3V3 / 19-SDA / 20-SCL ──► INA3221 VCC / SDA / SCL
+FireBeetle 3V3 / SDA / SCL ──► INA3221 **VS** / SDA / SCL   （黑板电源脚叫 VS，不是 VCC）
 ```
+
+`VPU` 是告警脚上拉电源，`A0` 是地址选择，都不用接。
 
 ch2 读数符号即净流向：**正 = 电池在放电，负 = 在充电**。
 24 h 积分就是当天的净收支。
@@ -61,10 +67,36 @@ ch2 读数符号即净流向：**正 = 电池在放电，负 = 在充电**。
 INA226 和 INA3221 默认都是 **0x40**，同一条 I²C 总线会撞。任选其一：
 
 - **分开测**（推荐）：一次只焊一块，接法 A 和 B 本来也是两个不同的实验
-- **改地址**：模块上 A0 焊盘接 VS(VCC) → 变成 0x41，然后改
-  `tools/ina-sampler/main/ina_sampler.c` 的 `INA_ADDR`
+- **改地址**：INA3221 的 `A0` 焊盘接 VS → 变成 0x41；INA226 蓝板背面 A0/A1 同理。
+  改完同步改 `tools/ina-sampler/main/ina_sampler.c` 的 `INA_ADDR`
 
 固件靠 die ID 自动识别是 226 还是 3221（0x2260 / 0x3220），不用手工选型号。
+
+---
+
+---
+
+## 第 0 步：自测——让 FireBeetle 量它自己
+
+在碰主控之前先用这一步验证整条链路（I²C 通了没、符号对不对、量程合不合适），
+**不影响正在跑的第 3 轮基线测试**。
+
+FireBeetle 板载 800 mAh LiPo 走 JST 进板，把 INA226 串进它的**红线**：
+
+```
+LiPo 红线 ──► [IN+ ] INA226 [ IN- ] ──► FireBeetle JST 红
+LiPo 黑线 ──────────────────────────► FireBeetle JST 黑（不动）
+```
+
+预期读数：
+
+| 工况 | 预期 | 说明 |
+|---|---|---|
+| 只吃电池、Wi-Fi/Thread 未起 | **+30～60 mA** | 正 = 放电 |
+| 插上 USB | **负值** | 负 = 在给电池充电，验证符号 |
+| vbus | 3.7～4.2 V | 和 LiPo 实际电压对得上 = VBS 焊对了 |
+
+读数落在这个范围 = 链路通了，可以放心接主控。
 
 ---
 
