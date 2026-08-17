@@ -27,3 +27,6 @@ __pycache__/
 /logs/
 /build-debug/
 /build-lbtest/
+/tools/ina-sampler/build/
+/tools/ina-sampler/sdkconfig
+/tools/ina-sampler/sdkconfig.old

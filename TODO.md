@@ -7,6 +7,13 @@
 
 ## 待办
 
+### 0. 电流实测（第 3 轮基线之后的下一步）
+
+INA226 / INA3221 已下单。到货后按 [`docs/current-measurement.md`](docs/current-measurement.md) 焊接，
+用 `tools/ina-sampler/` 固件 + `tools/ina_log.py` 直接读 idle 电流，
+不再靠 vbat LUT 反推。第一个要回答的问题：**light sleep 到底进没进**
+（均值 ~15 mA 且睡眠占比 0% = 没进）。
+
 ### 1. 实机长期观察（高优先级）
 
 装到窗户上连续运行约一周，目标：
