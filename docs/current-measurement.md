@@ -7,6 +7,9 @@
 
 固件：`tools/ina-sampler/`　上位机：`tools/ina_log.py`
 
+> 图用 Mermaid（GitHub 网页/手机端原生渲染），**照着焊请看表格**——
+> 表格能逐行核对，图只用来理解结构。
+
 ---
 
 ## 接法 A：主控电池电流（INA226）
@@ -18,35 +21,56 @@
 本项目全链路都是 JST-PH 2.0（电池、CN3791 模块都是），所以**不要剪电池线**，
 拿一根 **PH2.0 公母对插延长线**改造成带分流的转接线，可反复插拔：
 
-```
-电池端(母)  红 ──► [IN+ ] INA226 [ IN- ] ──► 红  负载端(公)
-            黑 ─────────────────────────────► 黑（直通，不断开）
+```mermaid
+flowchart LR
+  BAT["锂电池<br/>PH2.0 母头"]
+  subgraph INA226
+    INP["IN+"]
+    INM["IN-"]
+  end
+  LOAD["负载<br/>PH2.0 公头"]
+  BAT -->|红| INP
+  INP -->|"分流 R100 = 0.1Ω"| INM
+  INM -->|红| LOAD
+  BAT -->|"黑 · 直通不断开"| LOAD
 ```
 
 **`IN+` 朝电池、`IN-` 朝负载**。接反了电流符号相反（放电显示负值），
 数值仍对，但和文档里的约定不一致。
 
-这一根线：现在插在 FireBeetle 和它的 LiPo 之间自测，明晚基线结束后
+这一根线：现在插在 FireBeetle 和它的 LiPo 之间自测，基线测试结束后
 原样挪到主控的电池 ↔ CN3791 之间，不用重焊。
 
-### 接到主控
+### 焊接清单（INA226）
 
-```
-电池 ──[PH2.0 转接线（含 INA226）]──► CN3791 BAT+/BAT− ──► XIAO BAT pad
-FireBeetle GND ──► 与上面同一个地（CN3791 BAT− 或 XIAO GND 任一点）
-
-FireBeetle 3V3  ──► INA226 VCC
-FireBeetle SDA  ──► INA226 SDA     （正面 "SDA SCL GND 3V3" 那排焊盘，= GPIO19）
-FireBeetle SCL  ──► INA226 SCL     （= GPIO20）
-FireBeetle GND  ──► INA226 GND
-INA226 VBS      ──► INA226 IN-     （板上这两点不通，必须自己飞一根短线！）
-```
+| # | 从 | 到 | 说明 |
+|---|---|---|---|
+| 1 | 转接线红线 · 电池侧 | INA226 `IN+` | 方向别接反 |
+| 2 | 转接线红线 · 负载侧 | INA226 `IN-` | |
+| 3 | INA226 `VBS` | INA226 `IN-` | **板上这两点不通，必须飞一根短线** |
+| 4 | FireBeetle `3V3` | INA226 `VCC` | 采样芯片供电 |
+| 5 | FireBeetle `GND` | INA226 `GND` | |
+| 6 | FireBeetle `SDA` | INA226 `SDA` | 正面 `SDA SCL GND 3V3` 那排焊盘，= GPIO19 |
+| 7 | FireBeetle `SCL` | INA226 `SCL` | = GPIO20 |
+| — | 转接线黑线 | 直通，不断开 | 两端 PH2.0 之间原样连着 |
+| — | INA226 `ALE` | 不接 | 告警脚，用不上 |
 
 `VBS` = 总线电压检测脚。**不焊它电流照样准，只有电压读数是垃圾**——但接上就能和主控
 ADC 交叉标定（用来验证那个"ADC 偏低 80 mV"的疑点），所以顺手焊上。
-`ALE`（告警）不用接。
+
+### 接到主控时的全链路
+
+```mermaid
+flowchart LR
+  BAT["锂电池"] -->|PH2.0| ADP["PH2.0 转接线<br/>内含 INA226"]
+  ADP -->|PH2.0| CN["CN3791<br/>BAT+ / BAT-"]
+  CN --> XIAO["XIAO ESP32-C6<br/>BAT pad"]
+  ADP -.->|"I2C + 3V3 + GND"| FB["FireBeetle<br/>采样器"]
+  CN -.->|共地| FB
+```
 
 FireBeetle 自己用板载 LiPo 或 USB 供电都行；USB 插电脑才能收 CSV。
+测 idle 时太阳能要断开，否则量到的是净流。
 
 **为什么高边不用低边**：低边（串在 GND 侧）只要主控 USB 一插，地就通过电脑
 和 FireBeetle 连通，分流电阻被旁路，读数直接失效。高边不受影响，而且分流在
@@ -63,16 +87,30 @@ FireBeetle 自己用板载 LiPo 或 USB 供电都行；USB 插电脑才能收 CS
 三通道各有独立分流，一次看清"面板给多少、电池进出多少、主控吃多少"，
 直接回答"太阳能补多少安才能循环"。
 
+```mermaid
+flowchart LR
+  PV["太阳能板 +"] --> C1["CH1"] --> CNI["CN3791 VIN"]
+  BATP["锂电池 +"] --> C2["CH2"] --> CNB["CN3791 BAT"]
+  CNO["CN3791 OUT"] --> C3["CH3"] --> LOAD["XIAO BAT pad"]
+  subgraph INA3221
+    C1
+    C2
+    C3
+  end
 ```
-ch1  太阳能板 (+) ──► [1IN+ ] [ 1IN- ] ──► CN3791 VIN
-ch2  电池 (+)     ──► [2IN+ ] [ 2IN- ] ──► CN3791 BAT / XIAO BAT+
-ch3  CN3791 OUT   ──► [3IN+ ] [ 3IN- ] ──► 主控负载
 
-所有 (−) / GND 共地，FireBeetle GND 一并接过来
-FireBeetle 3V3 / SDA / SCL ──► INA3221 **VS** / SDA / SCL   （黑板电源脚叫 VS，不是 VCC）
-```
+### 焊接清单（INA3221）
 
-`VPU` 是告警脚上拉电源，`A0` 是地址选择，都不用接。
+| # | 从 | 到 | 说明 |
+|---|---|---|---|
+| 1 | 太阳能板 + | `1IN+` → `1IN-` → CN3791 VIN | ch1 = 面板输出 |
+| 2 | 锂电池 + | `2IN+` → `2IN-` → CN3791 BAT | ch2 = 电池净流 |
+| 3 | CN3791 OUT | `3IN+` → `3IN-` → 主控 | ch3 = 负载 |
+| 4 | FireBeetle `3V3` | INA3221 **`VS`** | **黑板电源脚叫 VS，不是 VCC** |
+| 5 | FireBeetle `GND` | INA3221 `GND` | 所有 (−) 必须共地 |
+| 6 | FireBeetle `SDA` | INA3221 `SDA` | |
+| 7 | FireBeetle `SCL` | INA3221 `SCL` | |
+| — | `VPU` / `A0` | 不接 | 告警上拉 / 地址选择，用不上 |
 
 ch2 读数符号即净流向：**正 = 电池在放电，负 = 在充电**。
 24 h 积分就是当天的净收支。
@@ -94,13 +132,15 @@ INA226 和 INA3221 默认都是 **0x40**，同一条 I²C 总线会撞。任选�
 ## 第 0 步：自测——让 FireBeetle 量它自己
 
 在碰主控之前先用这一步验证整条链路（I²C 通了没、符号对不对、量程合不合适），
-**不影响正在跑的第 3 轮基线测试**。
+**不影响正在跑的基线测试**。
 
 把上面做好的 PH2.0 转接线插在 FireBeetle 和它的板载 800 mAh LiPo 之间即可，
 不用另外焊接：
 
-```
-LiPo ──[PH2.0 转接线（含 INA226）]──► FireBeetle 电池座
+```mermaid
+flowchart LR
+  LIPO["板载 800 mAh LiPo"] -->|PH2.0| ADP["转接线<br/>内含 INA226"]
+  ADP -->|PH2.0| FB["FireBeetle 电池座"]
 ```
 
 预期读数：
