@@ -7,7 +7,14 @@
 
 ## 待办
 
-### 0. 电流实测（第 3 轮基线之后的下一步）
+### 0a. 第 4 轮基线：验证 light sleep 修复（最高优先级）
+
+2026-08-18 发现 light sleep 从未使能（`main_app.cpp` 缺 `esp_pm_configure`），已修。
+生产固件已烧上、USB 充电中。**明早拔 USB 起测 24 h**，起点 SoC 记进 `docs/power-tests.md` 第 4 轮。
+预期 24 h 掉幅 ≤ 1 mV/h（≥ 82%）；若仍 ~13 mA，用 INA226 看睡眠占比找剩下的锁。
+第一次在实机跑 light sleep，顺便确认：Home 里能控、按键能唤醒、电机运动正常（motor 锁）。
+
+### 0b. 电流实测
 
 INA226 / INA3221 已下单。到货后按 [`docs/current-measurement.md`](docs/current-measurement.md) 焊接，
 用 `tools/ina-sampler/` 固件 + `tools/ina_log.py` 直接读 idle 电流，

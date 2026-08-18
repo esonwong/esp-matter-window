@@ -36,3 +36,14 @@ idf.py -B build-debug -p <port> flash    # 不要 erase，保留配对与 diag �
 boot 后约 15 s 自动 printf `=== DIAG LOG DUMP ===` CSV。USB-JTAG 复位会重枚举串口，
 串口读取脚本要能重连；`idf.py monitor` 需要 TTY，非交互环境用 pyserial 直接读。
 测完基线前记得烧回生产固件（console 开着 ICD LIT 平均功耗高几 mA）。
+
+调试叠加层还开了 `CONFIG_PM_PROFILING`（`esp_pm_dump_locks()` 每 30 s 打一次，看 light sleep 占比和持锁者）
+和 `CONFIG_USJ_NO_AUTO_LS_ON_CONNECTION`（USB 插着就不睡，否则 console 在睡眠中停摆、日志断流）。
+
+**light sleep 相关的串口坑**：
+- 生产固件在电池/USB 上跑起来后会进 light sleep，USB-JTAG 醒不过来，`esptool` 报 `No serial data received`。
+  处理：按住 BOOT → 点 RESET → 松 BOOT 进下载模式再烧；烧完靠**物理 RESET** 启动。
+- 用 pyserial 拨 DTR/RTS 复位有时会让 ROM 进 `boot:0x17 DOWNLOAD`（GPIO9 被 USJ 拉低）。
+  看到这个就别再折腾控制线，请用户按物理 RESET；监听脚本要以 `dtr=False, rts=False` 打开串口。
+- 判断"app 在跑还是卡在下载模式"：`esptool.py --before no_reset --after no_reset read_mac`，
+  能连上 = ROM 在等下载（坏），`No serial data received` = app 在跑（好）。

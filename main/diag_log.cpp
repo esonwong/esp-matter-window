@@ -8,6 +8,7 @@
 #include "freertos/semphr.h"
 #include "nvs.h"
 #include "esp_adc/adc_oneshot.h"
+#include "esp_pm.h"
 #include "esp_adc/adc_cali.h"
 #include "esp_adc/adc_cali_scheme.h"
 #include <atomic>
@@ -170,6 +171,11 @@ static void debug_print_task(void *)
         uint32_t up = (uint32_t)(esp_timer_get_time() / 1000000);
         printf("[VBAT] t=%lus vbat=%d mV  heap=%lu KB\n",
             (unsigned long)up, v, (unsigned long)(esp_get_free_heap_size() / 1024));
+#if CONFIG_PM_PROFILING
+        // 谁在持 PM 锁、light sleep 实际占比——排查"配置了省电但没省下来"
+        printf("[PM] ---- lock dump t=%lus ----\n", (unsigned long)up);
+        esp_pm_dump_locks(stdout);
+#endif
     }
 }
 #endif

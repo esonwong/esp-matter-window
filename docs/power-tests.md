@@ -208,11 +208,11 @@ nSLEEP / light sleep 优化都以它为对照。
 | 电池 | 几周前换上的电池（品牌 / 标称 mAh 待填），2026-08-16 前已被放到 2.4 V brownout 循环 |
 | 开始 | **2026-08-17 20:43 拔 USB**（充满静置 13.8 h 后，起点开路 4056 mV） |
 | 起点 vbat / SoC | **4056 mV / Home 显示 85%**（与 LUT 插值 85.6% 吻合，固件与 Home 一致） |
-| 结束 | 计划 2026-08-18 20:43 之后（≥ 24 h） |
-| 终点 vbat / SoC | |
+| 结束 | **2026-08-18 21:34**（24.9 h） |
+| 终点 vbat / SoC | **3898 mV / Home 显示 64%** |
 | 固件 | 生产版（console 关闭，ICD LIT），commit 7df84a0（含低电量 deep sleep / LUT 下修 / NVS 节流） |
 | 太阳能 / USB | 均断开 |
-| 电流表读数（若有） | |
+| 电流表读数（若有） | 无（INA226 尚未焊） |
 
 ### 充电曲线（`logs/charge-2026-08-16.csv`，调试固件每 30 s 一条）
 
@@ -230,10 +230,19 @@ nSLEEP / light sleep 优化都以它为对照。
 
 ### 原始 HOURLY 数据
 
-```
-uptime_s, vbat_mv, SoC
-（dump 后粘贴）
-```
+完整 dump 见 `docs/diag-dumps/2026-08-18-round3-baseline.csv`。浓缩：
+
+| uptime | vbat | 段斜率 |
+|---|---|---|
+| 0 h（拔线前，USB 上）| 4058 mV | — |
+| 1 h | 4040 | |
+| 6 h | 4016 | −4.8 mV/h |
+| 12 h | 3974 | −7.0 mV/h |
+| 18 h | 3934 | −6.7 mV/h |
+| 24 h | 3896 | −6.3 mV/h |
+| 25 h | 3898 | |
+
+**1 h → 25 h：4040 → 3898 = 5.9 mV/h**，全程直线，每小时 −4～−10 mV 无阶跃，heap 稳定 262 KB。
 
 ### 24 h 后的判读对照表（起点 4056 mV / 85%）
 
@@ -251,13 +260,56 @@ uptime_s, vbat_mv, SoC
 （ADC 分辨率约 2 mV，但绝对精度存疑）。**要区分低电流区间必须靠 INA226 直测**，
 本轮电压法只用于确认量级。
 
-### 结论（待填）
+### 结论
 
-- 平均 idle 电流 = ___ mA（电流表）/ ___ mA（LUT 反推）
-- 与第 1 轮 16.5 mA 对比：
-- 旧电池验容结果：充电耗时 ___ h → 有效容量约 ___ mAh
-- 判断：如果新基线 ≥ 10 mA → light sleep 大概率没真正生效，下一步查 PM/ICD；
-  如果 ≤ 3 mA → 之前的续航短纯粹是电池问题，重点转向 nSLEEP + 太阳能。
+- **平均 idle ≈ 13 mA**（5.9 mV/h × 2.18 mAh/mV；Home 显示 64% 与之吻合）
+- 与第 1 轮 16.5 mA 同一量级 → 旧结论成立，只是旧电池容量把数字抬高了一点
+- 曲线是直线不是台阶 → **持续底电流**，不是周期性事件（重连/订阅）在耗电
+- 旧电池验容：不再需要——本轮充电曲线已证明容量正常（见上）
+
+### 根因（2026-08-18 晚，PM lock dump）
+
+在调试固件里打开 `CONFIG_PM_PROFILING` 每 30 s `esp_pm_dump_locks()`：
+
+```
+Mode stats:
+Mode      CPU_freq    Time(%)
+APB_MIN   40 M        94%
+APB_MAX   80 M         1%
+CPU_MAX   160M         3%
+```
+
+**没有 `SLEEP` 行**。`esp_pm_impl_dump_stats()` 源码注释：
+"don't display light sleep mode if it's not enabled" → `light_sleep_en == false`。
+
+- `CONFIG_PM_ENABLE` + `PM_DFS_INIT_AUTO` 只配置了动态变频（所以看到 40/80/160 MHz 切换），
+  `light_sleep_enable` 默认 false
+- OpenThread 那条 "Enable OpenThread light sleep, the wake up source is ESP timer" 是**误导性日志**：
+  `esp_openthread_sleep_init()` 只是建了一把 `ot_sleep` APB 锁，在 radio 空闲时释放，**从不调 `esp_pm_configure()`**
+- 真正的开关必须由**应用**调 `esp_pm_configure(&{.light_sleep_enable = true})`——esp-matter 的
+  Thread SED 参考例程 `door_lock` 就是这么做的，`main_app.cpp` 从来没调过
+- 结论：**到 2026-08-18 为止所有功耗数据都是在 light sleep 从未运行过的前提下测的**；
+  ICD LIT 参数、"14.5 mA 是 Thread radio" 的拆解，都要在修复后重新看
+
+**修复**（同晚）：`main_app.cpp` 显式 `esp_pm_configure(light_sleep_enable=true)`；
+`motor_ctrl` 驱动期间持 `ESP_PM_NO_LIGHT_SLEEP` 锁 + `gpio_sleep_sel_dis`（否则电机跑一半睡过去 IN1/IN2 悬空）；
+`led_ctrl` 同样 `gpio_sleep_sel_dis`。修复后 PM dump 出现 `SLEEP` 行
+（USB 插着时被 `usb_serial_jtag` 锁压住 0%，属预期）。
+
+---
+
+## 第 4 轮：light sleep 修复后基线（待开始）
+
+| 字段 | 值 |
+|---|---|
+| 固件 | 生产版，含 light sleep 修复（2026-08-18 22:40 构建） |
+| 起点 | 待填：USB 充满后拔线 |
+| 起点 vbat / SoC | |
+| 太阳能 / USB | 均断开 |
+| 预期 | 若 light sleep 真正生效，24 h 掉幅应 ≤ 1 mV/h（对照表见第 3 轮） |
+
+**判读**：起点若仍 ~85%，24 h 后 ≥ 82% = 修复有效（≤ 3 mA）；仍在 60–65% = 还有别的锁在持，
+需上 INA226 看睡眠占比。
 
 ---
 

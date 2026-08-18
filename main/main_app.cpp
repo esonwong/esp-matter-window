@@ -4,6 +4,7 @@
 #include "lowbat.h"
 #include "esp_log.h"
 #include "esp_system.h"
+#include "esp_pm.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include <nvs_flash.h>
@@ -57,6 +58,25 @@ extern "C" void app_main(void)
         ret = nvs_flash_init();
     }
     ESP_ERROR_CHECK(ret);
+
+    // ── 打开 light sleep ──────────────────────────────────────────────────
+    // CONFIG_PM_ENABLE + PM_DFS_INIT_AUTO 只配了动态变频，light_sleep_enable 默认 false；
+    // OpenThread 的 "Enable OpenThread light sleep" 日志只是建了把 ot_sleep 锁，从不调
+    // esp_pm_configure。必须由应用显式打开（同 esp-matter door_lock SED 例程）。
+    // 2026-08-18 第 3 轮基线 13 mA、PM dump 无 SLEEP 行，就是这一行缺失导致的。
+#if CONFIG_PM_ENABLE
+    {
+        esp_pm_config_t pm = {
+            .max_freq_mhz = CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ,
+            .min_freq_mhz = CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ,
+#if CONFIG_FREERTOS_USE_TICKLESS_IDLE
+            .light_sleep_enable = true,
+#endif
+        };
+        ESP_ERROR_CHECK(esp_pm_configure(&pm));
+        ESP_LOGI(TAG, "PM: light sleep 已使能 (%d MHz)", CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ);
+    }
+#endif
 
     // 板上诊断日志（NVS 环形缓冲 + ADC 电池电压采样）
     diag_log_init();

@@ -198,6 +198,17 @@ BAT pad ──[R1 100kΩ]──┬──► D2 (GPIO2, ADC1_CH2)
 
 ## ICD 配置摘要（`sdkconfig.defaults`）
 
+> ⚠️ **light sleep 不是配置项打开的，是应用代码打开的**。`CONFIG_PM_ENABLE` + `PM_DFS_INIT_AUTO`
+> 只给动态变频；`main_app.cpp` 里必须显式 `esp_pm_configure(.light_sleep_enable = true)`
+> （2026-08-18 之前一直缺这一行，所以之前所有 idle 电流数据都是"没睡"状态下测的，见
+> `docs/power-tests.md` 第 3 轮根因）。OpenThread 的 "Enable OpenThread light sleep" 日志
+> 只表示它建了把 `ot_sleep` 锁，不代表 light sleep 已使能。
+> 验证方法：调试固件（`sdkconfig.debug` 含 `PM_PROFILING`）每 30 s 打 `esp_pm_dump_locks()`，
+> Mode stats 里**必须有 `SLEEP` 行**；USB 插着时被 `usb_serial_jtag` 锁压住 0% 属预期。
+> light sleep 会把 GPIO 隔离成高阻：电机驱动期间 `motor_ctrl` 持 `NO_LIGHT_SLEEP` 锁，
+> 电机/LED 脚 `gpio_sleep_sel_dis`。
+
+
 ```
 CONFIG_ENABLE_ICD_SERVER=y
 CONFIG_ENABLE_ICD_LIT=y
@@ -235,6 +246,9 @@ CONFIG_SUPPORT_ICD_MANAGEMENT_CLUSTER=y
 - 4094 mV 没有到 4.2V 终止可能因为 ADC 测的 BAT pad 比充电 IC 输出端有几十 mV 压降 / ADC 标定误差
 
 ### Idle 电流拆解（ICD LIT 模式，~16.5 mA 平均）
+
+> **2026-08-18 更正**：这一节的数据是在 light sleep 从未使能的状态下测的（见 ICD 配置摘要的警告），
+> "ESP32-C6 + Thread radio 14.5 mA" 实际是 CPU 在 40 MHz 空转 + radio 常开。修复后需重测。
 **测量方法**（2026-05-17 14:22 实测）：定型固件，太阳能断开，纯电池放电 4 小时。
 HOURLY 快照 vbat：4080 → 4064 → 4058 → 4054 → 4050 mV（4 小时降 30 mV）。
 按 LUT 插值 SoC 88% → 85% = 3%，3% × 2200 mAh / 4h = **16.5 mA**。

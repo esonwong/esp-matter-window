@@ -49,6 +49,7 @@ void led_ctrl_init(gpio_num_t gpio)
     cfg.mode         = GPIO_MODE_OUTPUT;
     gpio_config(&cfg);
     gpio_set_level(s_gpio, 1);  // active-low: 1 = off
+    gpio_sleep_sel_dis(s_gpio); // light sleep 中保持电平，不被隔离
 
     esp_timer_create_args_t args = {
         .callback        = led_timer_cb,

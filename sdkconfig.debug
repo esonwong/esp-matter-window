@@ -3,3 +3,7 @@
 CONFIG_ESP_CONSOLE_NONE=n
 CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
 CONFIG_ESP_CONSOLE_SECONDARY_NONE=y
+# PM 统计：esp_pm_dump_locks() 能显示各锁持有时间与 light sleep 占比
+CONFIG_PM_PROFILING=y
+# USB 插着时不进 light sleep（否则 console 在睡眠中停摆、日志断流）。生产固件不受影响
+CONFIG_USJ_NO_AUTO_LS_ON_CONNECTION=y
