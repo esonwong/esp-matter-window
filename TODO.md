@@ -7,12 +7,11 @@
 
 ## 待办
 
-### 0a. 第 4 轮基线：验证 light sleep 修复（最高优先级）
+### 0a. ~~第 4 轮基线：验证 light sleep 修复~~ ✅ 完成（2026-08-20）
 
-2026-08-18 发现 light sleep 从未使能（`main_app.cpp` 缺 `esp_pm_configure`），已修。
-生产固件已烧上、USB 充电中。**明早拔 USB 起测 24 h**，起点 SoC 记进 `docs/power-tests.md` 第 4 轮。
-预期 24 h 掉幅 ≤ 1 mV/h（≥ 82%）；若仍 ~13 mA，用 INA226 看睡眠占比找剩下的锁。
-第一次在实机跑 light sleep，顺便确认：Home 里能控、按键能唤醒、电机运动正常（motor 锁）。
+**修复有效：idle 13 mA → ~4 mA**（84%→80% / 24.3 h），续航 6.5 天 → ~22 天，
+阴天太阳能即可收支转正。功能自检正常。详见 `docs/power-tests.md` 第 4 轮。
+剩余 ~4 mA 待 INA226 分解；优化顺序：nSLEEP 飞线 → INA226 → ICD poll A/B。
 
 ### 0b. 电流实测
 
