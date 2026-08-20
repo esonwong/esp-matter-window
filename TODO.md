@@ -20,6 +20,13 @@ INA226 / INA3221 已下单。到货后按 [`docs/current-measurement.md`](docs/c
 不再靠 vbat LUT 反推。第一个要回答的问题：**light sleep 到底进没进**
 （均值 ~15 mA 且睡眠占比 0% = 没进）。
 
+### 0c. A/B：console 常开的真实功耗代价
+
+"console 开着 LIT 高几 mA"的旧经验测于 light sleep 从未生效的年代，不可信。
+修好 light sleep 后重测：生产配置 vs 生产+USB-JTAG console+`USJ_NO_AUTO_LS_ON_CONNECTION`。
+若差 < 0.5 mA → 生产固件常开 console，插 USB 即可调试/烧录，
+消灭"睡着了 esptool 抓不住"的运维痛点（用 INA226 或 24h 电压法测）。
+
 ### 1. 实机长期观察（高优先级）
 
 装到窗户上连续运行约一周，目标：
