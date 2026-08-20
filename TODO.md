@@ -42,7 +42,8 @@ INA226 / INA3221 已下单。到货后按 [`docs/current-measurement.md`](docs/c
 - ~~`sdkconfig` 与 `sdkconfig.defaults` 不一致~~ 2026-08-16 已从 defaults 重新生成
 - `main_app.cpp` / `matter_app.cpp` 里的 reset reason 调试打印可保留也可删；定型后大概率 reset 都是 POWERON，观察价值不大
 - DRV8833 nSLEEP 控制（静止时拉低关断驱动芯片，省 ~1.6 mA）——软件已预留（`MOTOR_NSLEEP_GPIO`），等飞线
-- ~~工厂重置（长按按键 5 秒）~~ 已实现并编译通过（2026-08-16，长按动作待实机验证）
+- ~~工厂重置（长按按键 5 秒）~~ ✅ 实机验证通过（2026-08-20，diag 环确认触发并重启；
+  当时 LED 来不及闪导致被按了两次，已改为快闪 2 秒再重置）
 - ~~低压锁定电机~~ 已实现（vbat < 3.3 V 拒绝启动）
 - ~~低电量 deep sleep~~ 已实现并用测试固件验证 sleep→timer 唤醒→恢复（2026-08-16）；真实低压场景待实机观察
 

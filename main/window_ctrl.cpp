@@ -314,8 +314,22 @@ static void factory_reset_work(intptr_t)
     ESP_LOGW(TAG, "执行工厂重置：清除 Matter 配对与 NVS，随后重启");
     esp_matter::factory_reset();
 }
+// 独立任务：快闪 2 秒让人看见，再执行重置。
+// （2026-08-20 教训：直接 ScheduleWork 的话 <1s 就重启了，LED 根本没机会闪，
+//  用户以为没触发，又按了一次，重置执行了两遍。）
+static void factory_reset_task(void *)
+{
+    led_ctrl_set_mode(LED_BLINK_FAST);
+    vTaskDelay(pdMS_TO_TICKS(2000));
+    chip::DeviceLayer::PlatformMgr().ScheduleWork(factory_reset_work);
+    vTaskDelete(nullptr);
+}
+
 static void btn_cb_long_press(void *, void *)
 {
+    static std::atomic<bool> s_reset_pending{false};
+    if (s_reset_pending.exchange(true))
+        return; // 已在重置流程中，忽略重复长按
     diag_inc_button();
     diag_log_event(DIAG_BUTTON, 5);
     // 停下电机，避免重启瞬间窗户失控
@@ -323,8 +337,7 @@ static void btn_cb_long_press(void *, void *)
         s_cal_stop.store(true);
     else
         window_ctrl_stop();
-    led_ctrl_set_mode(LED_BLINK_FAST); // 快闪提示：即将重置
-    chip::DeviceLayer::PlatformMgr().ScheduleWork(factory_reset_work);
+    xTaskCreate(factory_reset_task, "freset", 3072, nullptr, 5, nullptr);
 }
 
 // ── 控制任务：纯监控，不发电机指令 ──────────────────────────────────────
