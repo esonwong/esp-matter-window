@@ -4,6 +4,9 @@
   "main": "src/index.js",
   "compatibility_date": "2026-08-01",
   "observability": { "enabled": true },
+  "routes": [
+    { "pattern": "matter-window.esonwong.com", "custom_domain": true }
+  ],
   "d1_databases": [
     { "binding": "DB", "database_name": "matter-window-logs", "database_id": "713b516c-ea85-4d3f-90bc-2183427bccff" }
   ],

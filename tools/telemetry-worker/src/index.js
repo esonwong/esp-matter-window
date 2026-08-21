@@ -1,3 +1,5 @@
+import { INDEX_HTML } from "./page.js";
+
 // matter-window telemetry + OTA worker
 // 认证：所有写入与读取都要 Bearer token（wrangler secret put API_TOKEN）
 // 设备端点：
@@ -30,6 +32,11 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     const p = url.pathname;
+
+    // 公开首页：项目介绍
+    if (request.method === "GET" && (p === "/" || p === "/index.html")) {
+      return new Response(INDEX_HTML, { headers: { "Content-Type": "text/html; charset=utf-8" } });
+    }
 
     if (!(await auth(request, env))) return unauthorized();
 

@@ -20,7 +20,7 @@ flowchart LR
 
 ```bash
 TOKEN=<token>   # 与 telemetry_secrets.h 相同
-BASE=https://matter-window.esonwong.workers.dev
+BASE=https://matter-window.esonwong.com
 
 curl -s "$BASE/reports?hours=48" -H "Authorization: Bearer $TOKEN"   # 心跳 + vbat 曲线
 curl -s "$BASE/logs?hours=24"    -H "Authorization: Bearer $TOKEN"   # diag 事件
