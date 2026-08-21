@@ -33,6 +33,7 @@ static bool s_adc_ok = false;
 
 static SemaphoreHandle_t s_mutex = nullptr;
 static uint8_t s_head = 0;
+static uint32_t s_seq = 0;  // 单调写入计数（下一条的序号）；持久化，供增量上报定位
 static diag_event_t s_ring[DIAG_RING_LEN] = {};
 
 static std::atomic<uint16_t> s_motor_count{0};
@@ -94,6 +95,7 @@ static void load_ring(void)
     size_t sz = sizeof(s_ring);
     nvs_get_blob(h, DIAG_KEY_RING, s_ring, &sz);
     nvs_get_u8(h, DIAG_KEY_HEAD, &s_head);
+    nvs_get_u32(h, "seq", &s_seq);
     nvs_close(h);
     // LEN=256 时 s_head (uint8_t) 自然限制在 0..255，无需边界检查；
     // 若日后改成 LEN<256 需要在这里 clamp 回 0
@@ -106,6 +108,7 @@ static void save_ring(void)
     if (nvs_open(DIAG_NS, NVS_READWRITE, &h) != ESP_OK) return;
     nvs_set_blob(h, DIAG_KEY_RING, s_ring, sizeof(s_ring));
     nvs_set_u8(h, DIAG_KEY_HEAD, s_head);
+    nvs_set_u32(h, "seq", s_seq);
     nvs_commit(h);
     nvs_close(h);
 }
@@ -147,6 +150,7 @@ void diag_log_event(diag_type_t type, uint8_t aux1, bool persist)
         if (type == DIAG_BOOT) ev.motor_count = 1;
         s_ring[s_head] = ev;
         s_head = (s_head + 1) % DIAG_RING_LEN;
+        s_seq++;
     }
     if (persist) save_ring();
     xSemaphoreGive(s_mutex);
@@ -179,6 +183,33 @@ static void debug_print_task(void *)
     }
 }
 #endif
+
+// ── 增量读取（供网络上报）──────────────────────────────────────────────
+// ring 里最旧条目的 seq = s_seq - 有效条数。请求比这更旧的直接从最旧给起。
+uint32_t diag_get_events_since(uint32_t since_seq, diag_event_t *out, uint32_t max_out,
+                               uint32_t *out_next_seq)
+{
+    if (!s_mutex) return 0;
+    xSemaphoreTake(s_mutex, portMAX_DELAY);
+    uint32_t valid = 0;
+    for (int i = 0; i < DIAG_RING_LEN; i++) {
+        const diag_event_t &e = s_ring[i];
+        if (!(e.uptime_s == 0 && e.type == 0)) valid++;
+    }
+    if (valid > (uint32_t)DIAG_RING_LEN) valid = DIAG_RING_LEN;
+    uint32_t oldest_seq = s_seq - valid;
+    if (since_seq < oldest_seq) since_seq = oldest_seq;   // 太旧的已被环覆盖
+    if (since_seq > s_seq) since_seq = s_seq;             // NVS 回退等异常
+    uint32_t n = 0;
+    for (uint32_t seq = since_seq; seq < s_seq && n < max_out; seq++) {
+        // seq 对应的槽位：s_head 是下一写入位 = s_seq 的槽位
+        int idx = ((int)s_head - (int)(s_seq - seq) + 2 * DIAG_RING_LEN) % DIAG_RING_LEN;
+        out[n++] = s_ring[idx];
+    }
+    if (out_next_seq) *out_next_seq = since_seq + n;
+    xSemaphoreGive(s_mutex);
+    return n;
+}
 
 // ── Dump：CSV 格式打印所有条目（按时间顺序，最旧→最新）─────────────────
 void diag_log_dump(void)

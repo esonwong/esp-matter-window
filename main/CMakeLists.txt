@@ -11,6 +11,11 @@ idf_component_register(
         esp_pm
         esp_matter
         espressif__button
+        esp_http_client
+        esp_https_ota
+        esp-tls
+        app_update
+        openthread
 )
 
 target_compile_options(${COMPONENT_LIB} PRIVATE

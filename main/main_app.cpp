@@ -2,6 +2,8 @@
 #include "window_ctrl.h"
 #include "diag_log.h"
 #include "lowbat.h"
+#include "telemetry.h"
+#include "esp_ota_ops.h"
 #include "esp_log.h"
 #include "esp_system.h"
 #include "esp_pm.h"
@@ -89,6 +91,15 @@ extern "C" void app_main(void)
 
     // 低电量保护：连续低压时进 deep sleep，防止把电池放死
     lowbat_monitor_start();
+
+    // OTA 回滚保护：能跑到这里说明新固件基本健康，确认当前槽有效
+    // （更严格的做法是等 Thread attach 后再确认，先取"能起来"）
+#if CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE
+    esp_ota_mark_app_valid_cancel_rollback();
+#endif
+
+    // 遥测上报 + OTA（走 Thread，见 docs/telemetry.md）
+    telemetry_start();
 
     ESP_LOGI(TAG, "初始化完成");
 }

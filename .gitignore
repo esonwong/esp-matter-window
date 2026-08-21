@@ -30,3 +30,6 @@ __pycache__/
 /tools/ina-sampler/build/
 /tools/ina-sampler/sdkconfig
 /tools/ina-sampler/sdkconfig.old
+main/telemetry_secrets.h
+node_modules/
+tools/telemetry-worker/.wrangler/

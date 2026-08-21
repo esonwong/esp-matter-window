@@ -39,6 +39,12 @@ void diag_log_init(void);
 // 下一次 persist=true 的事件或每小时快照会一并落盘
 void diag_log_event(diag_type_t type, uint8_t aux1 = 0, bool persist = true);
 
+// 上报支持：从 ring 里取出 [since_seq, ...) 的新条目（按时间序），返回条数。
+// seq 是单调递增的写入计数（不随环回绕丢失），配合 NVS 里记"已上报到哪"实现增量上报。
+struct diag_event_t;
+uint32_t diag_get_events_since(uint32_t since_seq, diag_event_t *out, uint32_t max_out,
+                               uint32_t *out_next_seq);
+
 // dump：按时间顺序 printf 所有条目（一行一条 CSV）
 // 仅在 USJ console 开启的调试固件里有效
 void diag_log_dump(void);
