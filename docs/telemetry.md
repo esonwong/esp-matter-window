@@ -4,6 +4,10 @@
 Cloudflare Worker；上报响应可携带 OTA 指令，设备用 `esp_https_ota` 拉新固件。
 **不开 Wi-Fi**，全程走 Thread（NAT64/DNS64 或原生 IPv6）。
 
+> **可选功能 / 隐私说明**：遥测完全自托管——每个使用者部署**自己的** Worker、用自己的
+> token，不存在向项目作者上报数据的通道。不创建 `main/telemetry_secrets.h` 时，
+> 遥测整体编译为空实现，`idf.py build` 开箱即过，固件不发起任何网络连接（Matter 之外）。
+
 - 固件端：`main/telemetry.cpp`（每小时一报，失败静默重试；NVS 记"已上报到 seq"）
 - 服务端：`tools/telemetry-worker/`（D1 存日志，R2 存固件）
 - 凭据：`main/telemetry_secrets.h`（gitignore，模板见 `.example`）；Worker 侧 `wrangler secret put API_TOKEN`

@@ -1,4 +1,12 @@
 #include "telemetry.h"
+
+// 遥测是可选功能：没有 telemetry_secrets.h（gitignore，见 .example）就整体编译为空实现，
+// 保证仓库克隆下来 idf.py build 直接能过，不强迫使用者先去部署 Cloudflare Worker。
+#if !__has_include("telemetry_secrets.h")
+#include "esp_log.h"
+void telemetry_start(void) { ESP_LOGI("TELEM", "未配置 telemetry_secrets.h，遥测关闭"); }
+void telemetry_report_now(void) {}
+#else
 #include "telemetry_secrets.h"
 #include "diag_log.h"
 #include "esp_log.h"
@@ -203,3 +211,5 @@ void telemetry_start(void)
     xTaskCreate(telemetry_task, "telem", 6144, nullptr, 3, &s_task);
     ESP_LOGI(TAG, "遥测已启动 device_id=%s 周期=%d s", s_device_id, TELEMETRY_INTERVAL_SEC);
 }
+
+#endif // __has_include("telemetry_secrets.h")

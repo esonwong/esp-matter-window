@@ -444,6 +444,7 @@ chip::DeviceLayer::PlatformMgr().ScheduleWork(icd_wake_work);
 - [x] 工厂重置（长按按键 5 秒）
 - [x] 低压锁定电机（vbat < 3.3 V 拒绝启动，防 brownout 复位循环）
 - [x] 低电量 deep sleep（连续 <3.1 V 休眠，每 10 min 醒来查电压，≥3.4 V 恢复）
+- [x] 遥测上报 + 远程 OTA（可选、自托管，走 Thread，见 [docs/telemetry.md](docs/telemetry.md)）
 - [x] diag 连续同原因 BOOT 合并（防欠压循环冲光环形缓冲）
 
 ## 许可
